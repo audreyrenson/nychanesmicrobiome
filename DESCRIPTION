@@ -15,4 +15,6 @@ Depends:
   phyloseq
 Imports:
   ggplot2,
-  IHW
+  IHW,
+  dplyr,
+  reshape2
