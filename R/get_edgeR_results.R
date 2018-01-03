@@ -30,12 +30,6 @@ get_edgeR_results <- function(formla, pseq=NYC_HANES, method=c("BH","IHW"),
   # nMinimumHaveCount, indicating how many samples must meet the countMinimum criteria
   # If method="IHW", no filtering is performed and and filtering arguments are ignored.
 
-  suppressPackageStartupMessages({
-    require(edgeR)
-    require(magrittr)
-    require(phyloseq)
-  })
-
 
   #create model matrix
   dsg.mtrx <- model.matrix(formla, data=data.frame(sample_data(pseq)))
@@ -60,7 +54,6 @@ get_edgeR_results <- function(formla, pseq=NYC_HANES, method=c("BH","IHW"),
   }
 
 
-
   #set up the glm fit
   disp <- estimateDisp(dge, design = dsg.mtrx)
   fit <- glmFit(disp, dsg.mtrx)
@@ -68,9 +61,8 @@ get_edgeR_results <- function(formla, pseq=NYC_HANES, method=c("BH","IHW"),
   results <- topTags(lrt, n=nrow(lrt$table))
 
   if(method[1]=="IHW") {
-    require("IHW")
     lrt$table$mean_abundance <- rowSums(otus) / ncol(otus)
-    ihwResult <- ihw(PValue ~ mean_abundance, data=lrt$table, alpha=alph)
+    ihwResult <- IHW::ihw(PValue ~ mean_abundance, data=lrt$table, alpha=alph)
     results$table$ihw_pvalue <- ihwResult@df$weighted_pvalue
     #filter out results that didn't pass alpha
     results <- results[results$table$ihw_pvalue < alph, ]
@@ -81,15 +73,12 @@ get_edgeR_results <- function(formla, pseq=NYC_HANES, method=c("BH","IHW"),
 
   # attach taxonomy names
   if(nrow(results$table) > 0) { #if any results pass the filter
-    results$table %<>%
-      cbind(as.matrix(tax_table(pseq)[rownames(results$table),]))
+    results$table <-
+      cbind(results$table, as.matrix(tax_table(pseq)[rownames(results$table),]))
   }
-
-
-
   results
-
 }
+
 #' @export
 #' @rdname get_edgeR_results
 get_edger_results_all_levels <- function(formla, ...) {
