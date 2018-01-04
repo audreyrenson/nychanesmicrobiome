@@ -334,18 +334,18 @@ impute_missing_values <- function(NYC_HANES){
   NYC_HANES
 }
 
-library(ggplot2)
-theme_transparent <- theme(axis.title = element_text(colour = "white"),
-                           axis.text = element_text(colour = "white"),
-                           title = element_text(colour = "white"),
-                           legend.text = element_text(colour = "white"),
-                           axis.ticks = element_line(colour = "white"),
-                           panel.border = element_rect(colour = "white"),
-                           panel.background = element_rect(fill = "transparent",colour = NA),
-                           plot.background =  element_rect(fill = "transparent",colour = NA),
-                           legend.background = element_rect(fill = "transparent",colour = NA),
-                           legend.key = element_rect(fill = "transparent",colour = NA),
-                           panel.grid = element_blank())
+
+theme_transparent <- ggplot2::theme(axis.title = ggplot2::element_text(colour = "white"),
+                           axis.text = ggplot2::element_text(colour = "white"),
+                           title = ggplot2::element_text(colour = "white"),
+                           legend.text = ggplot2::element_text(colour = "white"),
+                           axis.ticks = ggplot2::element_line(colour = "white"),
+                           panel.border = ggplot2::element_rect(colour = "white"),
+                           panel.background = ggplot2::element_rect(fill = "transparent",colour = NA),
+                           plot.background =  ggplot2::element_rect(fill = "transparent",colour = NA),
+                           legend.background = ggplot2::element_rect(fill = "transparent",colour = NA),
+                           legend.key = ggplot2::element_rect(fill = "transparent",colour = NA),
+                           panel.grid = ggplot2::element_blank())
 
 scale_palette <- c("#e41a1c","#377eb8","#4daf4a","#984ea3","#ff7f00")
 
