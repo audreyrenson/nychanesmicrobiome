@@ -18,10 +18,13 @@ vignette: >
 
 ```{r setup, include = FALSE}
 knitr::opts_chunk$set(
-  echo = FALSE, warning=FALSE,  message=FALSE,
+  echo = FALSE,
+  warning = FALSE,
+  message = FALSE,
   collapse = TRUE,
   comment = "#>"
-)
+  )
+
 suppressPackageStartupMessages({
   library(phyloseq)
   library(tableone)
@@ -41,6 +44,7 @@ suppressPackageStartupMessages({
   library(gridExtra)
   library(sas7bdat)
 })
+#remove in release
 devtools::load_all()
 ```
 
@@ -100,7 +104,7 @@ knitr::kable(table1, format="markdown", caption="Table 1. Sample demographics an
 
 ## Checking collinearity using Cramer's V
 
-```{r cramersV, fig.width=5, fig.height=3, fig.cap="Cramer's V showing moderate collinearity."}
+```{r cramersV, fig.cap="Examining collinearity among sociodemographic variables. Data are absolute value of pairwise Cramer’s V correlation coefficient between sociodemographic factor levels. Data are from the full sample (n=1,527) of the New York City Health and Nutrition Examination Survey, 2013-2014. Abbreviations: cat=categories; US=United States.."}
 cramer_vars <- c('AGEGRP5C','GENDER','EDU4CAT','INC3C','DMQ_2','RACE','US_BORN','OHQ_3','OHQ_5_3CAT','SMOKER4CAT','DBQ_10_3CAT')
 cramer_varlabs <-c("Age (5 cat)","Gender", "Education (4 cat)","Family Income (3 cat)",
                 "Marital Status","Race/Ethnicity","US- vs. Foreign-Born","Gum Disease","Mouthwash Use",
@@ -178,12 +182,63 @@ grid.rect(x = 0.5, y = 0.5, height = 0.995, width = 0.995, default.units = "npc"
 
 ```
 
+## Abundance
 
-Vignettes are long form documentation commonly included in packages. Because they are part of the distribution of the package, they need to be as compact as possible. The `html_vignette` output type provides a custom style sheet (and tweaks some options) to ensure that the resulting html is as small as possible. The `html_vignette` format:
+```{r phylum_abundance, fig.cap="Genus- and phylum-level relative abundances. Data are percent of overall communities within samples, summarized as mean ± standard deviation of percent across samples. Data are from the oral microbiome subsample (n=296) of the New York City Health and Nutrition Examination Survey, 2013-2014."}
+get_phyla_colors <- function(v,s) {
+  set.seed(48)
+  rev(sample(rainbow(n = 8,  start = 0.1, 
+                         end = 1, s = s, v=v),
+                 size=8, replace=FALSE))[c(2,1,3:8)]
+  
+}
+phyla_colors <- c(rbind(get_phyla_colors(v=.7,s=.5)[c(2,4,6,8)], 
+                        get_phyla_colors(v=.9,s=.7)[c(1,3,5,7)]))
 
-- Never uses retina figures
-- Has a smaller default figure size
-- Uses a custom CSS stylesheet instead of the default Twitter Bootstrap style
+
+g <- plot_abundance(NYC_HANES, PALETTE = phyla_colors, top_n = 8, prop = "total") +
+  labs(x = "└────────────── 296 Samples ───────────────┘", y = "", title = "") + 
+  scale_x_continuous(labels = NULL) + 
+  scale_y_continuous(labels = seq(0,100,25))
+
+p <- plot_abundance(NYC_HANES, top_n = 8, PALETTE =  phyla_colors, taxrank="Genus", 
+               prop = "total", type="area") 
+p <- p + labs(x="", y="", title="") + scale_x_continuous(labels=NULL) + scale_y_continuous(labels=seq(0,100,25))
+
+grid.arrange(p + theme(plot.margin=unit(c(1,0.95,-0.7,0.1), "cm"),
+                      panel.grid = element_blank()), 
+             g + theme(plot.margin=unit(c(-0.7,0.7,1,-0.1), "cm"),
+                      panel.grid = element_blank()), nrow=2, left="Abundance (%)")
+```
+
+# Alpha Diversity
+
+```{r alpha_diversity, fig.cap="Alpha diversity by Sociodemographic Characteristics. Chao1 alpha diversity of 16S rRNA oral microbiome samples. Measures were compared using a null hypothesis of no difference between groups (Kruskal-Wallis test, p > 0.1 for all tests). Data are from the oral microbiome subsample (n=296) of the New York City Health and Nutrition Examination Survey, 2013-2014. Abbreviations: GED=General equivalency diploma; PR=Puerto Rico; US=United States.", fig.height=7.2, fig.width=12}
+
+df_alpha <- cbind(table1_data[table1_data$dataset=="Oral Microbiome Subsample",
+                              -which(names(table1_data) %in% c("Years in United States", "Age (yrs)",
+                                                               "Gum disease (self-reported)",     
+                                                               "Mouthwash use (times per week)",  
+                                                               "Smoking status",
+                                                               "Sugar-sweetened beverages (per week)",
+                                                               "dataset"))  ])
+
+names(df_alpha)[c(3,4,7)] <- c("Educational \nachievement", "Family \nincome","Place of \nbirth")
+
+#calculate p-values
+df_alpha <- cbind(df_alpha, estimate_richness(NYC_HANES, measures = "Chao1")["Chao1"])
+
+ alpha_p <- "\n(P=" %>% paste0(sapply(names(df_alpha), function(i) 
+    kruskal.test(Chao1 ~ eval(as.name(i)), data=df_alpha)$p.value) %>% formatC(digits=2, format = "f")   ) %>%
+   paste0(")")
+
+ names(df_alpha)[-8] %<>% paste0(alpha_p)
+
+
+plot_alpha_by(NYC_HANES, metadata=df_alpha[-8], notch=FALSE)
+
+```
+
 
 ## Vignette Info
 
