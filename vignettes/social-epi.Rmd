@@ -1,0 +1,228 @@
+---
+title: "Vignette Title"
+author: "Vignette Author"
+date: "`r Sys.Date()`"
+output: 
+  BiocStyle::html_document:
+    fig_height: 7
+    fig_width: 10
+    fig_caption: yes
+    toc: yes
+    toc_depth: 2
+    number_sections: true
+vignette: >
+  %\VignetteIndexEntry{Sociodemographic variation in the oral microbiome}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  echo = FALSE, warning=FALSE,  message=FALSE,
+  collapse = TRUE,
+  comment = "#>"
+)
+suppressPackageStartupMessages({
+  library(phyloseq)
+  library(tableone)
+  library(mosaic)
+  library(ape)
+  library(vegan)
+  library(fpc)
+  library(cluster)
+  library(reshape2)
+  library(dplyr)
+  library(ggplot2)
+  library(gtable)
+  library(grid)
+  library(knitr)
+  library(htmlTable)
+  library(kableExtra)
+  library(gridExtra)
+  library(sas7bdat)
+})
+devtools::load_all()
+```
+
+
+```{r load_data, cache=TRUE}
+#pilot microbiome data
+suppressPackageStartupMessages({
+  NYC_HANES_raw <- loadQiimeData()
+  NYC_HANES <- annotateFactors(NYC_HANES_raw)
+})
+metadata <- data.frame(sample_data(NYC_HANES))
+
+#full NYC-HANES2 dataset 
+nychanes_sas <- read.sas7bdat("http://nychanes.org/wp-content/uploads/sites/6/2015/11/NYCHANES_2013_14_V2_09212016.sas7bdat")
+nychanes_full <- annotateFullDataset(nychanes_sas)
+```
+
+# Descriptives
+
+## Table 1: Demographics & Descriptive Statistics
+
+```{r table1, results='asis'}
+
+variablesToLook <- c("SPAGE", "AGEGRP5C", "GENDER","EDU4CAT","INC3C","DMQ_2","RACE","US_BORN",
+                     "DMQ_7YEAR","A1C","GLUCOSE", "AGEGRP3C", "EDU3CAT",
+                     "OHQ_3", "OHQ_5_3CAT","DBQ_10_3CAT")
+
+
+
+table1_data <- rbind(transform(formatMetadata(NYC_HANES), dataset="Oral Microbiome Subsample"),
+                     transform(formatMetadata(nychanes_full), dataset="Full NYC HANES Sample"))
+names(table1_data) <- c(names(formatMetadata(NYC_HANES)), "dataset")
+
+
+table1 <- CreateTableOne(vars=names(table1_data)[-which(names(table1_data)=="dataset")], strata="dataset",data=table1_data, includeNA = TRUE, test=FALSE)
+
+table1 <- print(table1, smd=TRUE, printToggle=FALSE)
+
+
+rownames(table1) <- rownames(prettytable_autoindent(vars = names(table1_data)[-which(names(table1_data)=="dataset")],data = table1_data, 
+                         includeNA = TRUE))
+
+
+rownames(table1)[1] <- "Total"
+rownames(table1) <- gsub("NA", "<i>Missing</i>", rownames(table1))
+rownames(table1)[2] <- "Age in years -- median [range]"
+table1[2,1:2 ] <- c(paste0(median(table1_data$`Age (yrs)`[table1_data$dataset=="Oral Microbiome Subsample"]), " [", min(table1_data$`Age (yrs)`[table1_data$dataset=="Oral Microbiome Subsample"]),
+                      " to ", max(table1_data$`Age (yrs)`[table1_data$dataset=="Oral Microbiome Subsample"]), "]"),
+                 paste0(median(table1_data$`Age (yrs)`[table1_data$dataset=="Full NYC HANES Sample"],na.rm=TRUE), " [", 
+                        min(table1_data$`Age (yrs)`[table1_data$dataset=="Full NYC HANES Sample"],na.rm=TRUE),
+                      " to ", max(table1_data$`Age (yrs)`[table1_data$dataset=="Full NYC HANES Sample"],na.rm=TRUE), "]"))
+
+
+knitr::kable(table1, format="markdown", caption="Table 1. Sample demographics and oral health behavioral characteristics.")
+
+```
+
+## Checking collinearity using Cramer's V
+
+```{r cramersV, fig.width=5, fig.height=3, fig.cap="Cramer's V showing moderate collinearity."}
+cramer_vars <- c('AGEGRP5C','GENDER','EDU4CAT','INC3C','DMQ_2','RACE','US_BORN','OHQ_3','OHQ_5_3CAT','SMOKER4CAT','DBQ_10_3CAT')
+cramer_varlabs <-c("Age (5 cat)","Gender", "Education (4 cat)","Family Income (3 cat)",
+                "Marital Status","Race/Ethnicity","US- vs. Foreign-Born","Gum Disease","Mouthwash Use",
+                "Smoking Status (4 cat)","Sugar-sweetened beverages (3 cat)")
+df_cramer <- nychanes_full[,cramer_vars]
+names(df_cramer) <- cramer_varlabs
+
+
+cramersV_matrix <- function (data) 
+{
+    mtrx <- sapply(1:ncol(data), function(var1) sapply(1:ncol(data), 
+        function(var2) lsr::cramersV(data[, var1], data[, var2])))
+    diag(mtrx) <- 1
+    rownames(mtrx) <- colnames(mtrx) <- colnames(data)
+    mtrx
+}
+
+mtrx_cramersV <- abs(cramersV_matrix(data=df_cramer))
+
+color_args <- list(name="Cramer's V",low = "blue", 
+  high = "darkorange")
+
+
+# Make a triangle
+mtrx_cramersV[lower.tri(mtrx_cramersV)] <- NA
+diag(mtrx_cramersV) <- NA
+mtrx_cramersV <- as.data.frame(mtrx_cramersV)
+
+# Convert to a data frame, and add labels
+df_cramer <- as.data.frame(mtrx_cramersV)
+df_cramer$var2 <- seq_along(rownames(df_cramer))
+
+# Reshape to suit ggplot, remove NAs, and sort the labels
+df_cramer <- na.omit(melt(df_cramer, 'var2', variable.name='var1'))
+df_cramer$var1 <- factor(df_cramer$var1, levels=rev(levels(df_cramer$var1)))
+
+p1 <- ggplot(df_cramer, aes(x=var1, y=var2, fill=value)) +
+    geom_tile() +
+    do.call(scale_fill_gradient, color_args) +
+    scale_y_continuous(breaks=1:11, labels=rev(levels(df_cramer$var1))) +
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 45, vjust=1, hjust = 1),
+          legend.position = "none") +
+    labs(x=NULL, y=NULL)
+
+#create boxplot
+mtrx_cramersV$var2 <- rownames(mtrx_cramersV)
+data_boxplot <-  reshape2::melt(mtrx_cramersV, "var2") %>% na.omit %>%
+  mutate(grp=NA, alph=-1*value + 1,
+         Name = paste0(var2, "*", variable))
+p2 <- ggplot(data_boxplot, aes(y=value, x=grp, col=value)) +
+  stat_boxplot(geom="errorbar") +
+  geom_boxplot(outlier.shape=NA) + 
+  geom_jitter(size=2) +
+  do.call(scale_color_gradient, color_args) +
+  theme(axis.ticks = element_blank(), 
+        axis.text = element_blank(), 
+        axis.title = element_blank(),
+        panel.background = element_blank(), 
+        plot.margin = unit(c(0, 0.1, 4, 0.5), "cm")) 
+
+gt1 <- ggplot_gtable(ggplot_build(p1))
+gt2 <- ggplot_gtable(ggplot_build(p2))
+gt <- gtable(widths = unit(c(5.5, 2.5), "null"), height = unit(8, "null"))
+
+
+# Instert gt1, gt2 and gt3 into the new gtable
+gt <- gtable_add_grob(gt, gt1, 1, 1)
+gt <- gtable_add_grob(gt, gt2, 1, 2)
+grid.newpage()
+grid.draw(gt)
+
+grid.rect(x = 0.5, y = 0.5, height = 0.995, width = 0.995, default.units = "npc", 
+    gp = gpar(col="transparent", fill = NA, lwd = 1))
+
+```
+
+
+Vignettes are long form documentation commonly included in packages. Because they are part of the distribution of the package, they need to be as compact as possible. The `html_vignette` output type provides a custom style sheet (and tweaks some options) to ensure that the resulting html is as small as possible. The `html_vignette` format:
+
+- Never uses retina figures
+- Has a smaller default figure size
+- Uses a custom CSS stylesheet instead of the default Twitter Bootstrap style
+
+## Vignette Info
+
+Note the various macros within the `vignette` section of the metadata block above. These are required in order to instruct R how to build the vignette. Note that you should change the `title` field and the `\VignetteIndexEntry` to match the title of your vignette.
+
+## Styles
+
+The `html_vignette` template includes a basic CSS theme. To override this theme you can specify your own CSS in the document metadata as follows:
+
+    output: 
+      rmarkdown::html_vignette:
+        css: mystyles.css
+
+## Figures
+
+The figure sizes have been customised so that you can easily put two images side-by-side. 
+
+```{r, fig.show='hold'}
+plot(1:10)
+plot(10:1)
+```
+
+You can enable figure captions by `fig_caption: yes` in YAML:
+
+    output:
+      rmarkdown::html_vignette:
+        fig_caption: yes
+
+Then you can use the chunk option `fig.cap = "Your figure caption."` in **knitr**.
+
+## More Examples
+
+You can write math expressions, e.g. $Y = X\beta + \epsilon$, footnotes^[A footnote here.], and tables, e.g. using `knitr::kable()`.
+
+```{r, echo=FALSE, results='asis'}
+knitr::kable(head(mtcars, 10))
+```
+
+Also a quote using `>`:
+
+> "He who gives up [code] safety for [code] speed deserves neither."
+([via](https://twitter.com/hadleywickham/status/504368538874703872))

@@ -18,3 +18,6 @@ Imports:
   IHW,
   dplyr,
   reshape2
+Suggests: knitr,
+    rmarkdown
+VignetteBuilder: knitr
