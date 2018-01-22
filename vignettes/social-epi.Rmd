@@ -1,7 +1,7 @@
 ---
-title: "Vignette Title"
-author: "Vignette Author"
-date: "`r Sys.Date()`"
+title: "NYC-HANES2 Social Epidemiology of the Oral Microbiome"
+author: "Audrey Renson"
+date: "January 22, 2018"
 output: 
   BiocStyle::html_document:
     fig_height: 7
@@ -49,7 +49,7 @@ devtools::load_all()
 ```
 
 
-```{r load_data, cache=TRUE}
+```{r load_data}
 #pilot microbiome data
 suppressPackageStartupMessages({
   NYC_HANES_raw <- loadQiimeData()
@@ -236,6 +236,112 @@ df_alpha <- cbind(df_alpha, estimate_richness(NYC_HANES, measures = "Chao1")["Ch
 
 
 plot_alpha_by(NYC_HANES, metadata=df_alpha[-8], notch=FALSE)
+
+```
+
+# edgeR Differential Abundance
+
+## Tileplot - OTU
+```{r otu_occurances_varlevels, cache=TRUE, fig.height=5.3, fig.width=11}
+
+model_vars = c('GENDER','AGEGRP3C','EDU3CAT','INC3C','DMQ_2','RACE','US_BORN')
+model_varlabs = c('Gender (5)','Age (52)','Education (14)','Family income (23)','Marital status (17)','Race/ethnicity (27)','US- vs. foreign-born (12)')
+
+#Get a dataframe of toptags from all models
+df_tile <- get_all_edgeR_models(model_vars, model_varlabs, to.data.frame=TRUE)
+
+#Attach genus information
+df_tile %<>% left_join(data.frame(OTU=rownames(tax_table(NYC_HANES)), Genus = tax_table(NYC_HANES)[,"Genus"]))
+
+#Sort genus by decreasing number of appearances
+df_tile$Genus <- factor(df_tile$Genus, levels=names(sort(table(df_tile$Genus), decreasing = TRUE)))
+
+
+#create a translator dataframe for coefficient labels and left join it to the toptags dataframe
+varnames <- c("GENDER","AGEGRP3C","EDU3CAT","INC3C","DMQ_2","RACE","US_BORN")
+varlevels <- unlist(sapply(varnames, function(i) levels(factor(eval(as.name(i), envir = metadata)))[-1]))
+varlabs <- c("Gender","Age group (3 cat)","Education (3 cat)","Income (3 cat)","Marital Status","Race/ethnicity","U.S. vs. foreign-born")
+times <- sapply(varnames, function(i) nlevels(factor(eval(as.name(i), envir = metadata)))-1)
+df_translate <- data.frame(coef=paste0(rep(varnames, times=times), varlevels),
+                           varlevel=varlevels,
+                           coef_lab=paste(rep(varlabs, times=times),
+                                          "=",varlevels),
+                           stringsAsFactors = FALSE)
+df_tile %<>% left_join(df_translate, by="coef")
+
+plot_logfc <- df_tile %>% na.omit %>% 
+    ggplot(aes(x=Genus, y=coef_lab, fill=logFC)) +
+    geom_tile(color="black") + theme_minimal() +
+    theme(axis.text.x = element_text(angle = 45, vjust=1, hjust = 1), strip.placement = "outside",
+          panel.spacing = unit(.5, "line")) +
+    scale_fill_gradient2(low = "seagreen4", mid = "white", high = "purple3") +
+    labs(y=NULL) 
+```
+
+
+## Tileplot - Oligotypes
+
+
+```{r Import oligotyping output}
+## TEMPORARY FIX for non-matching OTU names between tree and count matrix for Neisseria: 
+## Setting the phylo tree OTU names to be the count matrix OTU names.
+
+
+f <- c("Neisseria","Prevotella","Streptococcus")
+
+phylo.otut <- list()
+
+for (x in f) {
+  otumap <- read.table(paste0("../inst/extdata/", x,"_MATRIX-COUNT.txt"),  header = T,row.names = 1) %>% t
+  otumap <- otumap[,rownames(sample_data(NYC_HANES))]
+  taxmat <- matrix(sample(letters, 7*nrow(otumap), replace = TRUE), nrow = nrow(otumap), ncol = 7)
+  rownames(taxmat) <- rownames(otumap)
+  colnames(taxmat) <- c("Domain", "Phylum", "Class", "Order", "Family", "Genus", "Species")
+  otu.tree <- read.tree(paste0("../inst/extdata/", x, "_OLIGOS.tre"))
+  taxa_names(otu.tree) <- rownames(otumap)
+  phylo.otut[x] <- phyloseq(otu_table(otumap, taxa_are_rows = TRUE), 
+                            tax_table(taxmat), 
+                            phy_tree(otu.tree),
+                            sample_data(NYC_HANES)) 
+}
+
+```
+
+
+```{r oligo_edger, cache=TRUE, fig.width=10, fig.height=3.5}
+#relevel education and income according to new levels in annotateFactors()
+levels(sample_data(phylo.otut$Neisseria)$EDU3CAT) <- 
+  levels(sample_data(phylo.otut$Prevotella)$EDU3CAT) <- 
+  levels(sample_data(phylo.otut$Streptococcus)$EDU3CAT) <- levels(metadata$EDU3CAT)
+levels(sample_data(phylo.otut$Neisseria)$INC3C) <- 
+  levels(sample_data(phylo.otut$Prevotella)$INC3C) <- 
+  levels(sample_data(phylo.otut$Streptococcus)$INC3C) <- levels(metadata$INC3C)
+
+#get all models for each oligotype pseq
+df_neisseria <- get_all_edgeR_models(vars=model_vars, varlabels = model_varlabs, pseq=phylo.otut$Neisseria)
+df_prevotella <- get_all_edgeR_models(vars=model_vars, varlabels = model_varlabs, pseq=phylo.otut$Prevotella)
+df_streptococcus <- get_all_edgeR_models(vars=model_vars, varlabels = model_varlabs, pseq=phylo.otut$Streptococcus)
+
+#combine into one data.frame for plotting
+df_oligotypes <- rbind(data.frame(df_neisseria, Genus="Neisseria"),
+                       data.frame(df_prevotella, Genus="Prevotella"),
+                       data.frame(df_streptococcus, Genus="Streptococcus"))
+#attach coefficient level labels
+df_oligotypes %<>% left_join(df_translate, by="coef")
+
+#plot
+plot_oligo <- df_oligotypes %>%
+    ggplot(aes(x=OTU, y=coef_lab, fill=logFC)) +
+    geom_tile(color="black") + theme_minimal() +
+    theme(axis.text.x = element_blank(), panel.spacing = unit(.75, "cm")) +
+    scale_fill_gradient2(low = "seagreen4", mid = "white", high = "purple3") +
+    labs(y=NULL, x="Oligotype")  +
+    facet_grid(.~Genus,scales="free_x", space="free_x", drop=TRUE)
+
+```
+```{r tileplot_combine, fig.width=10, fig.height=8}
+
+grid.arrange(plot_logfc, plot_oligo, heights=c(4,3.3))
 
 ```
 

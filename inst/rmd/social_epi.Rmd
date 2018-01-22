@@ -37,8 +37,7 @@ source("edgeR_functions.R")
 ```
 
 
-```{r load_pilot_data, cache=TRUE}
-
+```{r load_pilot_data}
 
 suppressPackageStartupMessages({
   NYC_HANES_raw <- loadQiimeData()
@@ -149,9 +148,7 @@ dev.off()
 
 The present sample consists of 296 participants from NYC HANES on the basis of self-reported and serum-cotinine-confirmed tobacco use status. As such, the sample is demographically diverse with respect to age (median [range]: `r table1[2,]`), gender (`r t1tx["fem"]`% female), race/ethnicity (`r t1tx["nhw"]`% non-Hispanic White, `r t1tx["nhb"]`% non-Hispanic Black), annual family income (`r t1tx["lt30"]`% less than $30K, `r t1tx["gt60"]`% $60k or more), educational achievement (`r t1tx["hsd"]`% less than high school diploma, `r t1tx["cd"]`% college degree or greater), and birthplace (`r t1tx["us"]`% born in the U.S., Puerto Rico, or U.S. territories). See Table 1 for sample demographic and oral health characteristics.
 
-
-## Colinearity
-## Collinearity plot using Cramer's V instead of dummy variable correlation
+## Checking collinearity using Cramer's V
 
 ```{r cramersV, cache=TRUE, fig.width=5, fig.height=3, eval=FALSE}
 cramer_vars <- c('AGEGRP5C','GENDER','EDU4CAT','INC3C','DMQ_2','RACE','US_BORN','OHQ_3','OHQ_5_3CAT','SMOKER4CAT','DBQ_10_3CAT')
@@ -190,9 +187,6 @@ p1 <- ggplot(df_cramer, aes(x=var1, y=var2, fill=value)) +
     theme(axis.text.x = element_text(angle = 45, vjust=1, hjust = 1),
           legend.position = "none") +
     labs(x=NULL, y=NULL)
-
-
-
 
 #create boxplot
 mtrx_cramersV$var2 <- rownames(mtrx_cramersV)
