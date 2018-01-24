@@ -1,10 +1,10 @@
 #' @export
 loadQiimeData <- function(){
 
-  otu_table <- system.file("extdata","otu_table_mc10_w_tax_w_metadata.txt", package="nychanes2microbiome", mustWork = TRUE)
-	mapping_file <- system.file("extdata","mappingfile_corrected.txt", package="nychanes2microbiome", mustWork = TRUE)
-	tree_otu <- system.file("extdata","rep_set.tre", package="nychanes2microbiome", mustWork = TRUE)
-	rep_set <- system.file("extdata","rep_set.fna", package="nychanes2microbiome", mustWork = TRUE)
+  otu_table <- system.file("extdata","otu_table_mc10_w_tax_w_metadata.txt", package="nychanesmicrobiome", mustWork = TRUE)
+	mapping_file <- system.file("extdata","mappingfile_corrected.txt", package="nychanesmicrobiome", mustWork = TRUE)
+	tree_otu <- system.file("extdata","rep_set.tre", package="nychanesmicrobiome", mustWork = TRUE)
+	rep_set <- system.file("extdata","rep_set.fna", package="nychanesmicrobiome", mustWork = TRUE)
 
 	phylo <- import_biom(BIOMfilename = otu_table, treefilename = read_tree(tree_otu), refseqfilename = rep_set, refseqFunction = parse_taxonomy_default)
 	colnames(tax_table(phylo)) <- c("Domain", "Phylum", "Class", "Order", "Family", "Genus", "Species")
