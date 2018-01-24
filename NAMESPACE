@@ -2,4 +2,5 @@
 
 export(get_edgeR_results)
 export(get_edger_results_all_levels)
+export(loadQiimeData)
 export(plot_edgeR)

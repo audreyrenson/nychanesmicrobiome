@@ -359,8 +359,6 @@ dist_uni <- distance(NYC_HANES, method="unifrac")
 ```{r permanova_one_way, cache=TRUE}
 dist_perm <- dist_wuni
 
-
-
 permanova_var_names <- c("AGEGRP5C","GENDER","EDU4CAT","INC3C","DMQ_2","RACE","US_BORN","smokingstatus")
 
 df_permanova <- metadata[, permanova_var_names]
@@ -539,7 +537,7 @@ nrow(dge)
 
 
 ## Tileplot - OTU
-```{r otu_occurances_varlevels, fig.width=5.8, fig.height=3, cache=TRUE}
+```{r otu_occurances_varlevels, cache=TRUE, fig.height=5.3, fig.width=11}
 
 model_vars = c('GENDER','AGEGRP3C','EDU3CAT','INC3C','DMQ_2','RACE','US_BORN')
 model_varlabs = c('Gender (5)','Age (52)','Education (14)','Family income (23)','Marital status (17)','Race/ethnicity (27)','US- vs. foreign-born (12)')
@@ -569,45 +567,18 @@ df_tile %<>% left_join(df_translate, by="coef")
 df_tile$varlevel %<>% factor(levels = rev(levels(factor(df_tile$varlevel))[c(2,3,  15,7,  1,9,  12,8,4,13, 6,  10,11,14,16,5)]))
 df_tile$variable %<>% as.factor()
 
-plot_logfc1 <- df_tile %>% na.omit %>% 
-  filter(grepl("Education|Family income|Race/ethnicity|Age", variable)) %>%
-  filter(Genus %in% levels(Genus)[1:15]) %>%
+plot_logfc <- df_tile %>% na.omit %>% 
     ggplot(aes(x=Genus, y=varlevel, fill=logFC)) +
     geom_tile(color="black") + theme_minimal() +
     theme(axis.text.x = element_text(angle = 45, vjust=1, hjust = 1), strip.placement = "outside",
-          panel.spacing = unit(1, "line")) +
+          panel.spacing = unit(.5, "line")) +
     scale_fill_gradient2(low = "seagreen4", mid = "white", high = "purple3") +
     labs(y=NULL, x=NULL) +
     facet_grid(variable~., scale="free_y", space="free_y", switch = "y") + 
-    theme(strip.text.y = element_text(angle=180, hjust=0), legend.position = c(-1,-.3), legend.direction = "horizontal",
+    theme(strip.text.y = element_text(angle=180, hjust=0), legend.position = c(-.4,-.2), legend.direction = "horizontal",
           legend.key.size = unit(.45, "cm"))
-
-
-plot_logfc2 <- df_tile %>% na.omit %>% filter(!grepl("Education|Family income|Race/ethnicity|Age", variable)) %>%
-    ggplot(aes(x=Genus, y=varlevel, fill=logFC)) +
-    geom_tile(color="black") + theme_minimal() +
-    theme(axis.text.x = element_text(angle = 45, vjust=1, hjust = 1), strip.placement = "outside",
-          panel.spacing = unit(1, "line")) +
-    scale_fill_gradient2(low = "seagreen4", mid = "white", high = "purple3") +
-    labs(y=NULL, x=NULL) +
-    facet_grid(variable~., scale="free_y", space="free_y", switch = "y") + 
-    theme(strip.text.y = element_text(angle=180, hjust=0), legend.position = c(-.6,-.6), legend.direction = "horizontal",
-          legend.key.size = unit(.45, "cm"))
-
-
-
-
-svg(filename = "plot_logfc1.svg", width=5.9, height=3.4)
-  plot_logfc1
-dev.off()
-
-svg(filename = "plot_logfc2.svg", width=5.9, height=3)
-  plot_logfc2
-dev.off()
 
 plot_logfc 
-
-unique(df_tile$variable)
 
 ```
 

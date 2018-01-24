@@ -21,7 +21,7 @@ plot_edgeR(formla, ttle = NULL, varname = NULL, pseq = NYC_HANES,
 
 \item{printIfEmpty}{logical. If no results pass alpha, whether or not to plot an empty plot.}
 
-\item{invisbl}{logical. Whether or not to invisibly return the \code{topTags} object returned by \code{get_edgeR_results}.}
+\item{invisbl}{logical. Whether or not to forgoe plotting. Either way, invisibly returns the \code{topTags} object returned by \code{get_edgeR_results}.}
 
 \item{color}{character. Variable  to color by, from either the \code{tax_table} or the \code{topTags$table}.}
 
